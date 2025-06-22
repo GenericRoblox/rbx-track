@@ -5,7 +5,6 @@ export default async function handler(req, res) {
   const username = req.query.username;
 
   try {
-    // Convert username to userId
     if (!userId && username) {
       const userRes = await axios.post(
         'https://users.roblox.com/v1/usernames/users',
@@ -27,7 +26,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing userId or username.' });
     }
 
-    // Look for recent badge with a valid Place
     let cursor = null;
     let foundBadge = null;
     let attempts = 0;
@@ -36,14 +34,8 @@ export default async function handler(req, res) {
       const badgeRes = await axios.get(
         `https://badges.roblox.com/v1/users/${userId}/badges`,
         {
-          params: {
-            sortOrder: 'Desc',
-            limit: 100,
-            cursor: cursor || undefined,
-          },
-          headers: {
-            'User-Agent': 'Mozilla/5.0'
-          }
+          params: { sortOrder: 'Desc', limit: 100, cursor: cursor || undefined },
+          headers: { 'User-Agent': 'Mozilla/5.0' }
         }
       );
 
@@ -66,14 +58,11 @@ export default async function handler(req, res) {
     }
 
     const placeId = foundBadge.awarder.id;
-    const gameLink = `https://www.roblox.com/games/${placeId}`;
 
     const gameRes = await axios.get(
       `https://games.roblox.com/v1/games/multiget-place-details?placeIds=${placeId}`,
       {
-        headers: {
-          'User-Agent': 'Mozilla/5.0'
-        }
+        headers: { 'User-Agent': 'Mozilla/5.0' }
       }
     );
 
@@ -85,14 +74,14 @@ export default async function handler(req, res) {
     return res.status(200).json({
       gameName: game.name,
       gameDescription: game.description,
-      gameLink,
+      gameLink: `https://www.roblox.com/games/${placeId}`,
       placeId,
       latestBadge: foundBadge.name,
       badgeAwardedAt: foundBadge.awardedDate
     });
 
   } catch (err) {
-    console.error('❌ Fetch error:', err.message);
+    console.error('❌ Full error:', err);
     return res.status(500).json({ error: 'Failed to fetch Roblox data.' });
   }
 }
