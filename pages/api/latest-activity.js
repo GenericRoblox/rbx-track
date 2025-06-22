@@ -4,65 +4,75 @@ export default async function handler(req, res) {
   let userId = req.query.userId;
   const username = req.query.username;
 
-  try {
-    console.log("STEP 1: Starting...");
+  // Global headers to avoid 401 errors
+  const axiosConfig = {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      'Origin': 'https://www.roblox.com',
+      'Referer': 'https://www.roblox.com'
+    }
+  };
 
-    // Convert username to userId
+  try {
+    // Step 1: Convert username to userId if needed
     if (!userId && username) {
       const userRes = await axios.post(
         'https://users.roblox.com/v1/usernames/users',
-        { usernames: [username], excludeBannedUsers: true },
         {
-          headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0',
-          }
-        }
+          usernames: [username],
+          excludeBannedUsers: true
+        },
+        axiosConfig
       );
+
       userId = userRes.data.data?.[0]?.id;
-      if (!userId) return res.status(404).json({ step: "username->userId", error: "Username not found" });
+      if (!userId) {
+        return res.status(404).json({ error: 'Username not found.' });
+      }
     }
 
-    if (!userId) return res.status(400).json({ error: "Missing userId or username" });
-    console.log("STEP 2: Got userId", userId);
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing userId or username.' });
+    }
 
-    // Get most recent badge
-    const badgeListRes = await axios.get(
+    // Step 2: Get the user's most recent badge
+    const badgesRes = await axios.get(
       `https://badges.roblox.com/v1/users/${userId}/badges`,
       {
-        params: { sortOrder: "Desc", limit: 1 },
-        headers: { 'User-Agent': 'Mozilla/5.0' }
+        params: { sortOrder: 'Desc', limit: 1 },
+        ...axiosConfig
       }
     );
-    const recentBadge = badgeListRes.data.data?.[0];
-    if (!recentBadge) return res.status(404).json({ step: "badges", error: "No badges found" });
-    console.log("STEP 3: Got badge", recentBadge.name);
 
-    // Get badge details
-    const badgeDetails = await axios.get(
+    const recentBadge = badgesRes.data.data?.[0];
+    if (!recentBadge) {
+      return res.status(404).json({ error: 'No recent badges found.' });
+    }
+
+    // Step 3: Get detailed info for the badge (to find awardingUniverse)
+    const badgeDetailsRes = await axios.get(
       `https://badges.roblox.com/v1/badges/${recentBadge.id}`,
-      {
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      }
+      axiosConfig
     );
-    const universeId = badgeDetails.data?.awardingUniverse?.id;
-    if (!universeId) return res.status(404).json({ step: "badgeDetails", error: "No universe found" });
-    console.log("STEP 4: Got universeId", universeId);
 
-    // Get game details
+    const universeId = badgeDetailsRes.data?.awardingUniverse?.id;
+    if (!universeId) {
+      return res.status(404).json({ error: 'Badge has no linked universe/game.' });
+    }
+
+    // Step 4: Get game data from the universe ID
     const gameRes = await axios.get(
       `https://games.roblox.com/v1/games?universeIds=${universeId}`,
-      {
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      }
+      axiosConfig
     );
+
     const game = gameRes.data?.data?.[0];
-    if (!game) return res.status(404).json({ step: "game", error: "No game found for universe" });
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found for universe.' });
+    }
 
-    console.log("STEP 5: Got game", game.name);
-
+    // Final result
     return res.status(200).json({
-      step: "success",
       gameName: game.name,
       gameDescription: game.description,
       gameLink: `https://www.roblox.com/games/${game.rootPlaceId}`,
@@ -72,12 +82,10 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error("FULL ERROR:", error);
+    console.error("❌ Fetch error:", error.message);
     return res.status(500).json({
-      step: "exception",
-      message: error.message,
-      response: error.response?.data || "No response body",
-      status: error.response?.status || "Unknown status"
+      error: 'Failed to fetch Roblox data.',
+      details: error.response?.data || error.message
     });
   }
 }
