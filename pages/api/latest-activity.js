@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   const username = req.query.username;
 
   try {
-    // Convert username to userId
+    // Step 1: Convert username to userId
     if (!userId && username) {
       const userRes = await axios.post(
         'https://users.roblox.com/v1/usernames/users',
@@ -17,17 +17,21 @@ export default async function handler(req, res) {
           }
         }
       );
-      userId = userRes.data.data[0]?.id;
-      if (!userId) return res.status(404).json({ error: "Username not found." });
+      userId = userRes.data.data?.[0]?.id;
+      if (!userId) {
+        return res.status(404).json({ error: "Username not found." });
+      }
     }
 
-    if (!userId) return res.status(400).json({ error: "Missing userId or username." });
+    if (!userId) {
+      return res.status(400).json({ error: "Missing userId or username." });
+    }
 
-    let cursor = null;
+    // Step 2: Find a badge tied to a place
     let foundBadge = null;
+    let cursor = null;
     let attempts = 0;
 
-    // Search for a badge tied to a place/game
     while (attempts < 5 && !foundBadge) {
       const badgeRes = await axios.get(
         `https://badges.roblox.com/v1/users/${userId}/badges`,
@@ -57,18 +61,20 @@ export default async function handler(req, res) {
 
     const placeId = foundBadge.awarder.id;
 
-    // Get game details using the place ID
+    // Step 3: Fetch game details
     const gameRes = await axios.get(
       `https://games.roblox.com/v1/games/multiget-place-details?placeIds=${placeId}`,
       { headers: { 'User-Agent': 'Mozilla/5.0' } }
     );
 
-    const game = gameRes.data[0];
-    if (!game) return res.status(404).json({ error: "Game not found." });
+    const game = Array.isArray(gameRes.data) ? gameRes.data[0] : gameRes.data?.[0];
+    if (!game || !game.name) {
+      return res.status(404).json({ error: "Game not found for placeId." });
+    }
 
     return res.status(200).json({
       gameName: game.name,
-      gameDescription: game.description,
+      gameDescription: game.description || "",
       gameLink: `https://www.roblox.com/games/${placeId}`,
       placeId,
       latestBadge: foundBadge.name,
@@ -76,7 +82,7 @@ export default async function handler(req, res) {
     });
 
   } catch (err) {
-    console.error("❌ Fetch error:", err.message);
+    console.error("❌ Fetch error:", err?.message || err?.toString());
     return res.status(500).json({ error: "Failed to fetch Roblox data." });
   }
 }
