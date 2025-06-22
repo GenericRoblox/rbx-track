@@ -8,13 +8,19 @@ export default function Home() {
   async function fetchGame() {
     setError("");
     setResult(null);
-    const res = await fetch(`/api/latest-activity?username=${username}`);
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error || "Unknown error");
-      return;
+    try {
+      const res = await fetch(`/api/latest-activity?username=${username}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Unknown error");
+        return;
+      }
+
+      setResult(data);
+    } catch (e) {
+      setError("Network error");
     }
-    setResult(data);
   }
 
   return (
@@ -42,7 +48,7 @@ export default function Home() {
         borderRadius: "5px",
         cursor: "pointer"
       }}>
-        🔍 Find Game
+        🔍 Track Game
       </button>
 
       {error && <p style={{ color: "red", marginTop: 20 }}>❌ {error}</p>}
@@ -56,10 +62,10 @@ export default function Home() {
           backgroundColor: "#f9f9f9"
         }}>
           <h2>🎮 Game Info</h2>
-          <p><strong>Game Name:</strong> {result.gameName}</p>
-          <p><strong>Description:</strong> {result.gameDescription || "No description available."}</p>
+          <p><strong>Name:</strong> {result.gameName}</p>
+          <p><strong>Description:</strong> {result.gameDescription || "No description"}</p>
           <p><strong>Latest Badge:</strong> {result.latestBadge}</p>
-          <p><strong>Badge Awarded At:</strong> {new Date(result.badgeAwardedAt).toLocaleString()}</p>
+          <p><strong>Badge Awarded:</strong> {new Date(result.badgeAwardedAt).toLocaleString()}</p>
           <a
             href={result.gameLink}
             target="_blank"
@@ -74,7 +80,7 @@ export default function Home() {
               borderRadius: 4
             }}
           >
-            🔗 Go to Game
+            🔗 Visit Game
           </a>
         </div>
       )}
