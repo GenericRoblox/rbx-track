@@ -9,7 +9,12 @@ export default async function handler(req, res) {
       const userRes = await axios.post(
         'https://users.roblox.com/v1/usernames/users',
         { usernames: [username], excludeBannedUsers: true },
-        { headers: { 'Content-Type': 'application/json' } }
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0'
+          }
+        }
       );
       userId = userRes.data.data[0]?.id;
       if (!userId) {
@@ -33,6 +38,9 @@ export default async function handler(req, res) {
             sortOrder: 'Desc',
             limit: 100,
             cursor: cursor || undefined,
+          },
+          headers: {
+            'User-Agent': 'Mozilla/5.0'
           }
         }
       );
@@ -59,7 +67,12 @@ export default async function handler(req, res) {
     const gameLink = `https://www.roblox.com/games/${placeId}`;
 
     const gameRes = await axios.get(
-      `https://games.roblox.com/v1/games/multiget-place-details?placeIds=${placeId}`
+      `https://games.roblox.com/v1/games/multiget-place-details?placeIds=${placeId}`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0'
+        }
+      }
     );
 
     const game = gameRes.data[0];
