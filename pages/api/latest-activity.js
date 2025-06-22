@@ -5,6 +5,7 @@ export default async function handler(req, res) {
   const username = req.query.username;
 
   try {
+    // Convert username to userId
     if (!userId && username) {
       const userRes = await axios.post(
         'https://users.roblox.com/v1/usernames/users',
@@ -26,6 +27,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing userId or username.' });
     }
 
+    // Look for recent badge with a valid Place
     let cursor = null;
     let foundBadge = null;
     let attempts = 0;
