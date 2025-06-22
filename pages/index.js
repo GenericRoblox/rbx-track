@@ -4,13 +4,16 @@ export default function Home() {
   const [username, setUsername] = useState("");
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function fetchGame() {
     setError("");
     setResult(null);
+    setLoading(true);
     try {
       const res = await fetch(`/api/latest-activity?username=${username}`);
       const data = await res.json();
+      setLoading(false);
 
       if (!res.ok) {
         setError(data.error || "Unknown error");
@@ -20,12 +23,13 @@ export default function Home() {
       setResult(data);
     } catch (e) {
       setError("Network error");
+      setLoading(false);
     }
   }
 
   return (
     <main style={{ padding: 20, fontFamily: "sans-serif", maxWidth: 700, margin: "0 auto" }}>
-      <h1 style={{ fontSize: "2rem", marginBottom: "1rem" }}>RBX Activity Tracker</h1>
+      <h1 style={{ fontSize: "2rem", marginBottom: "1rem" }}>🎮 RBX Activity Tracker</h1>
 
       <input
         type="text"
@@ -48,7 +52,7 @@ export default function Home() {
         borderRadius: "5px",
         cursor: "pointer"
       }}>
-        🔍 Track Game
+        {loading ? "Loading..." : "Track Game"}
       </button>
 
       {error && <p style={{ color: "red", marginTop: 20 }}>❌ {error}</p>}
@@ -64,8 +68,8 @@ export default function Home() {
           <h2>🎮 Game Info</h2>
           <p><strong>Name:</strong> {result.gameName}</p>
           <p><strong>Description:</strong> {result.gameDescription || "No description"}</p>
-          <p><strong>Latest Badge:</strong> {result.latestBadge}</p>
-          <p><strong>Badge Awarded:</strong> {new Date(result.badgeAwardedAt).toLocaleString()}</p>
+          <p><strong>Badge:</strong> {result.latestBadge}</p>
+          <p><strong>Awarded:</strong> {new Date(result.badgeAwardedAt).toLocaleString()}</p>
           <a
             href={result.gameLink}
             target="_blank"
