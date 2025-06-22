@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   const username = req.query.username;
 
   try {
-    // Step 1: Convert username to userId
+    // Step 1: Convert username to userId if needed
     if (!userId && username) {
       const userRes = await axios.post(
         'https://users.roblox.com/v1/usernames/users',
@@ -13,76 +13,57 @@ export default async function handler(req, res) {
         {
           headers: {
             'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0'
-          }
+            'User-Agent': 'Mozilla/5.0',
+          },
         }
       );
-      userId = userRes.data.data?.[0]?.id;
-      if (!userId) {
-        return res.status(404).json({ error: "Username not found." });
+      userId = userRes.data.data[0]?.id;
+      if (!userId) return res.status(404).json({ error: 'Username not found.' });
+    }
+
+    if (!userId) return res.status(400).json({ error: 'Missing userId or username.' });
+
+    // Step 2: Get recent badges
+    const badgeRes = await axios.get(
+      `https://badges.roblox.com/v1/users/${userId}/badges`,
+      {
+        params: { sortOrder: 'Desc', limit: 1 },
+        headers: { 'User-Agent': 'Mozilla/5.0' },
       }
-    }
+    );
 
-    if (!userId) {
-      return res.status(400).json({ error: "Missing userId or username." });
-    }
+    const recentBadge = badgeRes.data.data?.[0];
+    if (!recentBadge) return res.status(404).json({ error: 'No recent badges found.' });
 
-    // Step 2: Find a badge tied to a place
-    let foundBadge = null;
-    let cursor = null;
-    let attempts = 0;
-
-    while (attempts < 5 && !foundBadge) {
-      const badgeRes = await axios.get(
-        `https://badges.roblox.com/v1/users/${userId}/badges`,
-        {
-          params: { sortOrder: "Desc", limit: 100, cursor: cursor || undefined },
-          headers: { 'User-Agent': 'Mozilla/5.0' }
-        }
-      );
-
-      const { data, nextPageCursor } = badgeRes.data;
-      if (!data || data.length === 0) break;
-
-      for (const badge of data) {
-        if (badge.awarder?.type === "Place" && badge.awarder?.id) {
-          foundBadge = badge;
-          break;
-        }
-      }
-
-      cursor = nextPageCursor;
-      attempts++;
-    }
-
-    if (!foundBadge) {
-      return res.status(404).json({ error: "No badge tied to a game found." });
-    }
-
-    const placeId = foundBadge.awarder.id;
-
-    // Step 3: Fetch game details
-    const gameRes = await axios.get(
-      `https://games.roblox.com/v1/games/multiget-place-details?placeIds=${placeId}`,
+    // Step 3: Get details about the badge to retrieve the awardingUniverse
+    const badgeDetailRes = await axios.get(
+      `https://badges.roblox.com/v1/badges/${recentBadge.id}`,
       { headers: { 'User-Agent': 'Mozilla/5.0' } }
     );
 
-    const game = Array.isArray(gameRes.data) ? gameRes.data[0] : gameRes.data?.[0];
-    if (!game || !game.name) {
-      return res.status(404).json({ error: "Game not found for placeId." });
-    }
+    const universeId = badgeDetailRes.data?.awardingUniverse?.id;
+    if (!universeId) return res.status(404).json({ error: 'No game info tied to the badge.' });
+
+    // Step 4: Get game info from universe ID
+    const universeRes = await axios.get(
+      `https://games.roblox.com/v1/games?universeIds=${universeId}`,
+      { headers: { 'User-Agent': 'Mozilla/5.0' } }
+    );
+
+    const game = universeRes.data.data?.[0];
+    if (!game) return res.status(404).json({ error: 'Game not found.' });
 
     return res.status(200).json({
       gameName: game.name,
-      gameDescription: game.description || "",
-      gameLink: `https://www.roblox.com/games/${placeId}`,
-      placeId,
-      latestBadge: foundBadge.name,
-      badgeAwardedAt: foundBadge.awardedDate
+      gameDescription: game.description,
+      gameLink: `https://www.roblox.com/games/${game.rootPlaceId}`,
+      placeId: game.rootPlaceId,
+      latestBadge: recentBadge.name,
+      badgeAwardedAt: recentBadge.awardedDate,
     });
 
   } catch (err) {
-    console.error("❌ Fetch error:", err?.message || err?.toString());
-    return res.status(500).json({ error: "Failed to fetch Roblox data." });
+    console.error('❌ Fetch error:', err.message);
+    return res.status(500).json({ error: 'Failed to fetch Roblox data.' });
   }
 }
