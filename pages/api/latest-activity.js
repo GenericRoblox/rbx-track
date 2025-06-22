@@ -5,6 +5,7 @@ export default async function handler(req, res) {
   const username = req.query.username;
 
   try {
+    // If username is provided, convert it to userId
     if (!userId && username) {
       const userRes = await axios.post(
         'https://users.roblox.com/v1/usernames/users',
@@ -16,6 +17,7 @@ export default async function handler(req, res) {
           }
         }
       );
+
       userId = userRes.data.data[0]?.id;
       if (!userId) {
         return res.status(404).json({ error: 'Username not found.' });
@@ -26,6 +28,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing userId or username.' });
     }
 
+    // Loop through recent badges until a badge tied to a place is found
     let cursor = null;
     let foundBadge = null;
     let attempts = 0;
@@ -59,11 +62,10 @@ export default async function handler(req, res) {
 
     const placeId = foundBadge.awarder.id;
 
+    // Get game info from the place ID
     const gameRes = await axios.get(
       `https://games.roblox.com/v1/games/multiget-place-details?placeIds=${placeId}`,
-      {
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      }
+      { headers: { 'User-Agent': 'Mozilla/5.0' } }
     );
 
     const game = gameRes.data[0];
@@ -71,6 +73,7 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Game not found.' });
     }
 
+    // Return result
     return res.status(200).json({
       gameName: game.name,
       gameDescription: game.description,
@@ -81,7 +84,7 @@ export default async function handler(req, res) {
     });
 
   } catch (err) {
-    console.error('❌ Full error:', err);
+    console.error('❌ Full error:', err.message);
     return res.status(500).json({ error: 'Failed to fetch Roblox data.' });
   }
 }
