@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   const username = req.query.username;
 
   try {
-    // Step 1: Convert username to userId if needed
+    // Step 1: Convert username to userId
     if (!userId && username) {
       const userRes = await axios.post(
         'https://users.roblox.com/v1/usernames/users',
@@ -13,57 +13,81 @@ export default async function handler(req, res) {
         {
           headers: {
             'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0',
-          },
+            'User-Agent': 'Mozilla/5.0'
+          }
         }
       );
-      userId = userRes.data.data[0]?.id;
-      if (!userId) return res.status(404).json({ error: 'Username not found.' });
+
+      userId = userRes.data.data?.[0]?.id;
+      if (!userId) {
+        return res.status(404).json({ error: 'Username not found.' });
+      }
     }
 
-    if (!userId) return res.status(400).json({ error: 'Missing userId or username.' });
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing userId or username.' });
+    }
 
-    // Step 2: Get recent badges
-    const badgeRes = await axios.get(
+    // Step 2: Get the user's most recent badge
+    const badgesRes = await axios.get(
       `https://badges.roblox.com/v1/users/${userId}/badges`,
       {
-        params: { sortOrder: 'Desc', limit: 1 },
-        headers: { 'User-Agent': 'Mozilla/5.0' },
+        params: {
+          sortOrder: 'Desc',
+          limit: 1
+        },
+        headers: {
+          'User-Agent': 'Mozilla/5.0'
+        }
       }
     );
 
-    const recentBadge = badgeRes.data.data?.[0];
-    if (!recentBadge) return res.status(404).json({ error: 'No recent badges found.' });
+    const badge = badgesRes.data.data?.[0];
+    if (!badge) {
+      return res.status(404).json({ error: 'No recent badges found.' });
+    }
 
-    // Step 3: Get details about the badge to retrieve the awardingUniverse
-    const badgeDetailRes = await axios.get(
-      `https://badges.roblox.com/v1/badges/${recentBadge.id}`,
-      { headers: { 'User-Agent': 'Mozilla/5.0' } }
+    // Step 3: Get detailed badge info to extract awardingUniverse
+    const badgeDetailsRes = await axios.get(
+      `https://badges.roblox.com/v1/badges/${badge.id}`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0'
+        }
+      }
     );
 
-    const universeId = badgeDetailRes.data?.awardingUniverse?.id;
-    if (!universeId) return res.status(404).json({ error: 'No game info tied to the badge.' });
+    const universeId = badgeDetailsRes.data?.awardingUniverse?.id;
+    if (!universeId) {
+      return res.status(404).json({ error: 'No universe linked to badge.' });
+    }
 
-    // Step 4: Get game info from universe ID
-    const universeRes = await axios.get(
+    // Step 4: Get the game data from the universe
+    const gameRes = await axios.get(
       `https://games.roblox.com/v1/games?universeIds=${universeId}`,
-      { headers: { 'User-Agent': 'Mozilla/5.0' } }
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0'
+        }
+      }
     );
 
-    const game = universeRes.data.data?.[0];
-    if (!game) return res.status(404).json({ error: 'Game not found.' });
+    const game = gameRes.data?.data?.[0];
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found for universe.' });
+    }
 
     return res.status(200).json({
       gameName: game.name,
       gameDescription: game.description,
       gameLink: `https://www.roblox.com/games/${game.rootPlaceId}`,
       placeId: game.rootPlaceId,
-      latestBadge: recentBadge.name,
-      badgeAwardedAt: recentBadge.awardedDate,
+      latestBadge: badge.name,
+      badgeAwardedAt: badge.awardedDate
     });
 
-  } catch (err) {
-    console.error('❌ Fetch error:', err.message);
+  } catch (error) {
+    console.error('❌ FULL ERROR:', error.response?.data || error.message);
     return res.status(500).json({ error: 'Failed to fetch Roblox data.' });
   }
 }
